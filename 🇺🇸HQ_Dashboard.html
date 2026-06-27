@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BTB 統合経営ダッシュボード</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f7f6f2;
+  --surface: #ffffff;
+  --surface2: #f0efe9;
+  --border: rgba(0,0,0,0.1);
+  --text: #1a1a1a;
+  --text2: #6b6b65;
+  --accent: #1a5c3a;
+  --accent2: #e8f5ee;
+  --amber: #c47a1a;
+  --amber-bg: #fdf3e0;
+  --red: #c0392b;
+  --red-bg: #fdf0ee;
+  --blue: #1a4a8a;
+  --blue-bg: #e8f0fc;
+}
+body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+header h1 { font-size: 16px; font-weight: 500; letter-spacing: -0.2px; }
+header span { font-size: 12px; color: var(--text2); }
+.tab-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; gap: 0; }
+.tab { padding: 12px 18px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--text2); transition: all 0.15s; white-space: nowrap; }
+.tab.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 500; }
+.tab:hover:not(.active) { color: var(--text); background: var(--surface2); }
+.main { display: flex; height: calc(100vh - 90px); }
+.content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+.panel { display: none; }
+.panel.active { display: block; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.card { background: var(--surface); border-radius: 10px; border: 1px solid var(--border); padding: 16px 20px; }
+.card h3 { font-size: 12px; color: var(--text2); font-weight: 400; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.metric-big { font-size: 28px; font-weight: 500; letter-spacing: -1px; }
+.metric-sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.metric-pos { color: var(--accent); }
+.metric-neg { color: var(--red); }
+.metric-warn { color: var(--amber); }
+.chart-wrap { position: relative; height: 220px; width: 100%; }
+.chart-wrap-tall { position: relative; height: 300px; width: 100%; }
+.section-title { font-size: 13px; font-weight: 500; color: var(--text2); margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+.badge-green { background: var(--accent2); color: var(--accent); }
+.badge-amber { background: var(--amber-bg); color: var(--amber); }
+.badge-red { background: var(--red-bg); color: var(--red); }
+.badge-blue { background: var(--blue-bg); color: var(--blue); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-weight: 500; padding: 8px 10px; background: var(--surface2); color: var(--text2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.neg-num { color: var(--red); }
+.pos-num { color: var(--accent); }
+.legend-row { display: flex; gap: 16px; margin-bottom: 10px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+.legend-swatch { width: 10px; height: 10px; border-radius: 2px; }
+.link-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.link-chip { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 12px; cursor: pointer; background: var(--surface); color: var(--text2); transition: all 0.15s; }
+.link-chip:hover { background: var(--accent2); border-color: var(--accent); color: var(--accent); }
+.link-chip.active { background: var(--accent2); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+/* Chat sidebar */
+.chat-sidebar { width: 360px; border-left: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; }
+.chat-header { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+.chat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.msg { max-width: 90%; }
+.msg-user { align-self: flex-end; background: var(--accent); color: white; padding: 10px 14px; border-radius: 12px 12px 3px 12px; font-size: 13px; line-height: 1.5; }
+.msg-ai { align-self: flex-start; background: var(--surface2); padding: 10px 14px; border-radius: 12px 12px 12px 3px; font-size: 13px; line-height: 1.6; }
+.msg-ai p { margin-bottom: 6px; }
+.msg-ai p:last-child { margin-bottom: 0; }
+.msg-ai strong { font-weight: 500; }
+.msg-ai ul { padding-left: 16px; }
+.msg-ai li { margin-bottom: 3px; }
+.chat-input-area { padding: 12px; border-top: 1px solid var(--border); }
+.quick-q { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.q-chip { padding: 4px 10px; border: 1px solid var(--border); border-radius: 20px; font-size: 11px; color: var(--text2); cursor: pointer; background: var(--surface); transition: all 0.15s; white-space: nowrap; }
+.q-chip:hover { background: var(--accent2); border-color: var(--accent); color: var(--accent); }
+.chat-input-row { display: flex; gap: 8px; }
+.chat-input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; font-family: inherit; }
+.chat-input:focus { border-color: var(--accent); }
+.send-btn { padding: 8px 14px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.send-btn:hover { opacity: 0.85; }
+.thinking { color: var(--text2); font-style: italic; font-size: 12px; }
+.month-selector { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.m-chip { padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border); font-size: 12px; cursor: pointer; background: var(--surface); color: var(--text2); }
+.m-chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+.flow-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.flow-box { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); text-align: center; }
+.flow-box .label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+.flow-box .val { font-size: 18px; font-weight: 500; }
+.flow-arrow { color: var(--text2); font-size: 18px; }
+.alert-box { padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; font-size: 13px; line-height: 1.5; }
+.alert-warn { background: var(--amber-bg); border-left: 3px solid var(--amber); }
+.alert-ok { background: var(--accent2); border-left: 3px solid var(--accent); }
+.alert-danger { background: var(--red-bg); border-left: 3px solid var(--red); }
+.progress-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.progress-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.3s; }
+.progress-fill.warn { background: var(--amber); }
+.progress-fill.danger { background: var(--red); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧈 BTB 統合経営ダッシュボード</h1>
+  <span id="current-month-label">2026年 — 在庫・仕入・販売・資金繰り 統合ビュー</span>
+</header>
+
+<div class="tab-bar">
+  <div class="tab active" onclick="switchTab('overview')">概要</div>
+  <div class="tab" onclick="switchTab('sales')">営業計画</div>
+  <div class="tab" onclick="switchTab('inventory')">在庫・仕入</div>
+  <div class="tab" onclick="switchTab('pl')">損益</div>
+  <div class="tab" onclick="switchTab('cashflow')">資金繰り</div>
+  <div class="tab" onclick="switchTab('integrated')">統合連動</div>
+</div>
+
+<div class="main">
+<div class="content">
+
+<!-- OVERVIEW PANEL -->
+<div id="panel-overview" class="panel active">
+  <div class="section-title">2026年度 主要KPI（日本 + 米国）</div>
+  <div class="grid4">
+    <div class="card">
+      <h3>年間売上目標</h3>
+      <div class="metric-big">¥633M</div>
+      <div class="metric-sub">日本 ¥583M + 米国 $623K</div>
+    </div>
+    <div class="card">
+      <h3>米国 月間売上（6月）</h3>
+      <div class="metric-big metric-pos">$46K</div>
+      <div class="metric-sub">前月比 +48% ↑</div>
+    </div>
+    <div class="card">
+      <h3>日本 売上総利益率（計画）</h3>
+      <div class="metric-big metric-warn">29.0%</div>
+      <div class="metric-sub">2025年実績 25.9%から改善</div>
+    </div>
+    <div class="card">
+      <h3>米国 損益分岐月</h3>
+      <div class="metric-big metric-pos">6月〜</div>
+      <div class="metric-sub">営業利益 $1,173 達成見込み</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>米国 月次売上推移（USD）</h3>
+      <div class="legend-row">
+        <div class="legend-item"><div class="legend-swatch" style="background:#1a5c3a"></div>売上</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#c47a1a"></div>販管費</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#1a4a8a; opacity:0.5"></div>営業利益</div>
+      </div>
+      <div class="chart-wrap"><canvas id="us-monthly-chart" role="img" aria-label="米国月次売上・費用・営業利益"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>日本 月次売上推移（千円）</h3>
+      <div class="legend-row">
+        <div class="legend-item"><div class="legend-swatch" style="background:#1a5c3a"></div>2026計画</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#b0b0a0; border: 1px dashed #888"></div>2025実績</div>
+      </div>
+      <div class="chart-wrap"><canvas id="jp-monthly-chart" role="img" aria-label="日本月次売上2025実績vs2026計画"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-title">アラート・要注意事項</div>
+  <div class="alert-warn">⚠️ <strong>KeHE 2027プロモーションロードマップ</strong> — 提出期限 7/17〜31。Midori最終署名必要。予算 ~$70K（Phase 2クローズ連動）</div>
+  <div class="alert-warn">⚠️ <strong>Erewhon 採用後デモ</strong> — 月1回 × 2ヶ月必須。13店舗 × 2SKU。コスト管理注意。</div>
+  <div class="alert-ok">✅ <strong>Misfits Market オンボード完了</strong> — CA展開後、全国ロールアウト予定。Net30（実受取6〜8週）</div>
+  <div class="alert-ok">✅ <strong>BTB商標登録完了</strong> — Reg #8179153、2026/3/17発効。US法人への移転手続き進行中</div>
+  <div class="alert-danger">🔴 <strong>花村社長 債務返済</strong> — 7月$30K、11月残額（日本 ¥28M）。スケジュール管理要。</div>
+</div>
+
+<!-- SALES PANEL -->
+<div id="panel-sales" class="panel">
+  <div class="section-title">米国 小売店別 月次売上見込み（USD）</div>
+  <div class="month-selector" id="us-month-sel"></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>チャネル別売上構成</h3>
+      <div class="chart-wrap"><canvas id="us-channel-chart" role="img" aria-label="米国チャネル別売上"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>上期 vs 下期 累計</h3>
+      <table>
+        <thead><tr><th>区分</th><th class="num">上期合計</th><th class="num">下期目標</th><th class="num">通期</th></tr></thead>
+        <tbody>
+          <tr><td>売上 (USD)</td><td class="num">$95,671</td><td class="num">$527,253</td><td class="num">$622,924</td></tr>
+          <tr><td>粗利</td><td class="num">$27,678</td><td class="num">$157,982</td><td class="num">$185,660</td></tr>
+          <tr><td>粗利率</td><td class="num">28.9%</td><td class="num">30.0%</td><td class="num">29.8%</td></tr>
+          <tr><td>販管費</td><td class="num">$228,077</td><td class="num">$257,944</td><td class="num">$486,021</td></tr>
+          <tr><td>営業利益</td><td class="num neg-num">($136,042)</td><td class="num pos-num">$257,221</td><td class="num">$121,179</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h3>主要小売チャネル進捗</h3>
+    <table>
+      <thead><tr><th>チャネル</th><th>ステータス</th><th>店舗数</th><th>月次売上目安</th><th class="num">進捗</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>KeHE DC41（West）</td>
+          <td><span class="badge badge-green">稼働中</span></td>
+          <td>44店舗</td>
+          <td>~$30K/月</td>
+          <td class="num">
+            <div class="progress-bar"><div class="progress-fill" style="width:44%"></div></div>
+            44/1000
+          </td>
+        </tr>
+        <tr>
+          <td>Erewhon (13店)</td>
+          <td><span class="badge badge-amber">採用確定・デモ待ち</span></td>
+          <td>13店舗</td>
+          <td>$7,900+</td>
+          <td class="num">
+            <div class="progress-bar"><div class="progress-fill warn" style="width:13%"></div></div>
+            促進費確定
+          </td>
+        </tr>
+        <tr>
+          <td>Misfits Market</td>
+          <td><span class="badge badge-green">CA展開済</span></td>
+          <td>全国→</td>
+          <td>Net30(実6〜8W)</td>
+          <td class="num">
+            <div class="progress-bar"><div class="progress-fill" style="width:30%"></div></div>
+            全国展開中
+          </td>
+        </tr>
+        <tr>
+          <td>Good Eggs（Bay Area）</td>
+          <td><span class="badge badge-amber">7月ローンチ</span></td>
+          <td>Bay Area</td>
+          <td>TPR 20%</td>
+          <td class="num">
+            <div class="progress-bar"><div class="progress-fill warn" style="width:10%"></div></div>
+            7月開始
+          </td>
+        </tr>
+        <tr>
+          <td>Sprouts（最重要）</td>
+          <td><span class="badge badge-red">交渉中（James）</span></td>
+          <td>全国</td>
+          <td>採用→DC33起動</td>
+          <td class="num">
+            <div class="progress-bar"><div class="progress-fill danger" style="width:15%"></div></div>
+            最優先
+          </td>
+        </tr>
+        <tr>
+          <td>New Seasons</td>
+          <td><span class="badge badge-amber">Levi条件提出中</span></td>
+          <td>—</td>
+          <td>—</td>
+          <td class="num">
+            <div class="progress-bar"><div class="progress-fill warn" style="width:20%"></div></div>
+            調整中
+          </td>
+        </tr>
+        <tr>
+          <td>Citarella (East Coast)</td>
+          <td><span class="badge badge-blue">Q4 2026目標</span></td>
+          <td>NY</td>
+          <td>Andy経由</td>
+          <td class="num">
+            <div class="progress-bar"><div class="progress-fill" style="width:5%; background:var(--blue)"></div></div>
+            Q4開始予定
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- INVENTORY PANEL -->
+<div id="panel-inventory" class="panel">
+  <div class="section-title">在庫・仕入 状況</div>
+  <div class="grid4">
+    <div class="card">
+      <h3>日本 期末棚卸（12月実績）</h3>
+      <div class="metric-big">¥63.3M</div>
+      <div class="metric-sub">2025/12月末実績</div>
+    </div>
+    <div class="card">
+      <h3>在庫回転月数（計画）</h3>
+      <div class="metric-big metric-warn">1.4〜1.7</div>
+      <div class="metric-sub">月（適正：1.0〜1.5）</div>
+    </div>
+    <div class="card">
+      <h3>米国 在庫場所</h3>
+      <div class="metric-big" style="font-size:18px">Americold</div>
+      <div class="metric-sub">West: DC41(Chino) / East: Q4〜</div>
+    </div>
+    <div class="card">
+      <h3>USDA Organic ラベル</h3>
+      <div class="metric-big metric-pos">7月〜</div>
+      <div class="metric-sub">7月出荷分より on-pack適用</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h3>日本 月次棚卸推移（千円）</h3>
+    <div class="legend-row">
+      <div class="legend-item"><div class="legend-swatch" style="background:#1a5c3a"></div>期末棚卸高</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#c47a1a"></div>仕入高</div>
+    </div>
+    <div class="chart-wrap-tall"><canvas id="inventory-chart" role="img" aria-label="日本月次棚卸・仕入推移"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h3>仕入計画・製造スケジュール（2026年）</h3>
+    <table>
+      <thead><tr><th>時期</th><th>イベント</th><th>製品</th><th>製造元</th><th>ステータス</th></tr></thead>
+      <tbody>
+        <tr><td>1〜3月</td><td>KeHE PO3575040（6月）/ PO3526989（修正）</td><td>BTB Original / Sea Salt</td><td>OLEO（O社）</td><td><span class="badge badge-green">完了</span></td></tr>
+        <tr><td>4〜6月</td><td>KeHE PO3662405（8月納品）</td><td>BTB Unsalted需要増</td><td>OLEO（O社）</td><td><span class="badge badge-green">PO発行済</span></td></tr>
+        <tr><td>7〜8月</td><td>USDA Organic on-pack切り替え</td><td>全SKU</td><td>OLEO（O社）</td><td><span class="badge badge-amber">7月出荷〜</span></td></tr>
+        <tr><td>8月</td><td>D2C + Amazon ローンチ</td><td>Coconut Crisps / Brownie Crisps</td><td>AG Pacific（A社）</td><td><span class="badge badge-amber">量産準備中</span></td></tr>
+        <tr><td>12月</td><td>ZEN Snack D2C + Amazon</td><td>なつめ / クコ / ハスの実</td><td>A社</td><td><span class="badge badge-blue">計画中</span></td></tr>
+        <tr><td>Q4 2026</td><td>東海岸展開（Bozzuto's）</td><td>BTB + Sheet Butter</td><td>OLEO（O社）</td><td><span class="badge badge-blue">Q4〜</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title">📦 KeHE PO管理</div>
+  <div class="card">
+    <table>
+      <thead><tr><th>PO番号</th><th>状態</th><th>内容</th><th>注意事項</th></tr></thead>
+      <tbody>
+        <tr><td>PO3526989</td><td><span class="badge badge-warn badge-amber">修正中</span></td><td>誤ってクローズされた</td><td>Taylor対応中</td></tr>
+        <tr><td>PO3575040</td><td><span class="badge badge-green">6月</span></td><td>通常補充</td><td>QuickBooks手入力</td></tr>
+        <tr><td>PO3662405</td><td><span class="badge badge-blue">8月</span></td><td>次回入荷</td><td>USDA organic対応品</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PL PANEL -->
+<div id="panel-pl" class="panel">
+  <div class="section-title">損益計算書 — 日本 2025年実績 vs 2026年計画（千円）</div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="legend-row">
+      <div class="legend-item"><div class="legend-swatch" style="background:#1a5c3a"></div>2026計画 売上</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#b0c4d0"></div>2025実績 売上</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#c47a1a; opacity:0.7"></div>2026計画 販管費</div>
+    </div>
+    <div class="chart-wrap-tall"><canvas id="jp-pl-chart" role="img" aria-label="日本損益計画vs実績"></canvas></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>日本 月次損益サマリー（千円）</h3>
+      <table>
+        <thead><tr><th>月</th><th class="num">売上</th><th class="num">粗利率</th><th class="num">営業利益</th></tr></thead>
+        <tbody id="jp-pl-table"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>米国 月次損益サマリー（USD）</h3>
+      <table>
+        <thead><tr><th>月</th><th class="num">売上</th><th class="num">粗利</th><th class="num">営業利益</th></tr></thead>
+        <tbody id="us-pl-table"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- CASHFLOW PANEL -->
+<div id="panel-cashflow" class="panel">
+  <div class="section-title">資金繰り 概況</div>
+  <div class="grid3">
+    <div class="card">
+      <h3>Phase 2 調達目標（USD）</h3>
+      <div class="metric-big">$1.5M</div>
+      <div class="metric-sub">2026年8月クローズ目標</div>
+      <div class="progress-bar" style="margin-top:10px"><div class="progress-fill warn" style="width:20%"></div></div>
+      <div class="metric-sub" style="margin-top:4px">IVS + Singapore BC候補</div>
+    </div>
+    <div class="card">
+      <h3>Japan Phase 1（JPY）</h3>
+      <div class="metric-big">¥20M</div>
+      <div class="metric-sub">確定（¥40M交渉継続中）</div>
+      <div class="progress-bar" style="margin-top:10px"><div class="progress-fill warn" style="width:33%"></div></div>
+      <div class="metric-sub" style="margin-top:4px">要敦子 ¥10M + 小野社長 ¥10M</div>
+    </div>
+    <div class="card">
+      <h3>JFC 資本性劣後ローン</h3>
+      <div class="metric-big metric-warn">¥50M</div>
+      <div class="metric-sub">審査中 → 面接（Midori）</div>
+      <div class="progress-bar" style="margin-top:10px"><div class="progress-fill warn" style="width:40%"></div></div>
+      <div class="metric-sub" style="margin-top:4px">居場さん 基本資料提出済</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h3>月次キャッシュフロー試算（米国 USD）— 資金需要</h3>
+    <div class="legend-row">
+      <div class="legend-item"><div class="legend-swatch" style="background:#1a5c3a"></div>売上キャッシュイン</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#c0392b"></div>総支出（仕入+販管費）</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#1a4a8a; opacity:0.6"></div>累積損益</div>
+    </div>
+    <div class="chart-wrap-tall"><canvas id="cashflow-chart" role="img" aria-label="米国月次キャッシュフロー"></canvas></div>
+  </div>
+
+  <div class="section-title">主要 借入・返済スケジュール</div>
+  <div class="card">
+    <table>
+      <thead><tr><th>相手先</th><th>種別</th><th>金額</th><th>期日</th><th>ステータス</th></tr></thead>
+      <tbody>
+        <tr><td>花村社長 / 新光電気</td><td>日本 借入</td><td>¥28M（再借入）</td><td>2026年11月</td><td><span class="badge badge-amber">要返済</span></td></tr>
+        <tr><td>花村社長 / 新光電気</td><td>US 借入</td><td>$199,990</td><td>$30K: 7月 / 残: 11月</td><td><span class="badge badge-red">要返済</span></td></tr>
+        <tr><td>池森/山岸さん</td><td>出資候補 ¥30M</td><td>¥30M</td><td>8月以降→前倒し依頼済</td><td><span class="badge badge-amber">交渉中</span></td></tr>
+        <tr><td>JFC</td><td>資本性劣後ローン</td><td>¥50M</td><td>審査中</td><td><span class="badge badge-blue">申請中</span></td></tr>
+        <tr><td>SVB</td><td>US 当座 + MMA</td><td>—</td><td>日常</td><td><span class="badge badge-green">稼働中</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title">プロモーション費用 確定分（2026年）</div>
+  <div class="card">
+    <table>
+      <thead><tr><th>チャネル</th><th class="num">確定費用</th><th>内容</th><th>担当</th></tr></thead>
+      <tbody>
+        <tr><td>Erewhon (13店)</td><td class="num">$7,900</td><td>$3,950/SKU×2 + Free Fill 1cs/SKU/店</td><td>James/Anna</td></tr>
+        <tr><td>Lassen's (11店)</td><td class="num">TBD</td><td>Free Fill + Demos + TPR</td><td>James</td></tr>
+        <tr><td>Good Eggs</td><td class="num">20% TPR</td><td>Product Spotlight + 四半期</td><td>—</td></tr>
+        <tr><td>KeHE INFRA Seed</td><td class="num">50% OFF</td><td>6〜7月 (選考待ち)</td><td>Taylor</td></tr>
+        <tr><td>KeHE 2027ロードマップ</td><td class="num">~$70K</td><td>期限7/17〜31、Midori署名要</td><td><span class="badge badge-red">要対応</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- INTEGRATED PANEL -->
+<div id="panel-integrated" class="panel">
+  <div class="section-title">📊 統合連動ビュー — 月次で全指標を横断確認</div>
+  <div class="month-selector" id="integrated-month-sel"></div>
+
+  <div id="integrated-detail">
+    <div class="grid4" id="integrated-kpi"></div>
+    <div class="grid2">
+      <div class="card" id="integrated-flow">
+        <h3>資金フロー（月次）</h3>
+      </div>
+      <div class="card" id="integrated-signals">
+        <h3>注目シグナル</h3>
+      </div>
+    </div>
+    <div class="card">
+      <h3>全指標 横断テーブル（米国 USD）</h3>
+      <div style="overflow-x:auto">
+        <table id="integrated-table">
+          <thead><tr>
+            <th>月</th><th class="num">売上</th><th class="num">仕入原価</th><th class="num">粗利</th><th class="num">粗利率</th><th class="num">販管費</th><th class="num">営業利益</th><th class="num" style="border-left:2px solid var(--border);color:var(--amber)">🇯🇵 棚卸（千円）</th><th class="num" style="color:var(--amber)">仕入（千円）</th><th class="num" style="color:var(--amber)">回転月数</th><th>状況</th>
+          </tr></thead>
+          <tbody id="integrated-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<!-- CHAT SIDEBAR -->
+<div class="chat-sidebar">
+  <div class="chat-header">
+    <div class="chat-dot"></div>
+    AI 経営アシスタント
+  </div>
+  <div class="chat-messages" id="chat-messages">
+    <div class="msg">
+      <div class="msg-ai">
+        <p>みどりさん、こんにちは。<strong>BTB統合ダッシュボード</strong>にようこそ。</p>
+        <p>在庫・仕入・営業・資金繰りを横断して質問できます。例えば：</p>
+        <ul>
+          <li>「6月の資金繰りを教えて」</li>
+          <li>「Sprouts採用で何が変わる？」</li>
+          <li>「仕入タイミングの推奨は？」</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="chat-input-area">
+    <div class="quick-q">
+      <div class="q-chip" onclick="sendQuick('6月〜8月の資金繰りリスクを教えて')">6〜8月の資金繰りリスク</div>
+      <div class="q-chip" onclick="sendQuick('Sprouts採用されたら何が変わる？')">Sprouts採用の影響</div>
+      <div class="q-chip" onclick="sendQuick('在庫回転率を改善するには？')">在庫改善提案</div>
+      <div class="q-chip" onclick="sendQuick('Phase2クローズが遅れたら？')">Phase2遅延リスク</div>
+      <div class="q-chip" onclick="sendQuick('KeHEの2027ロードマップ提出に向けて何を準備すべき？')">KeHE 2027ロードマップ</div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="chat-in" class="chat-input" placeholder="経営課題を質問してください..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button class="send-btn" onclick="sendChat()">送信</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+const US = {
+  sales:    [3409,1500,9000,4610,31129,46022,40373,77127,102625,84052,109120,113956],
+  cogs:     [288,0,909,90,909,1440,909,2340,3159,1710,2259,1710],
+  gross:    [0,450,2700,1383,9339,13807,12112,23138,30788,25216,32736,34187],
+  sga:      [30379,21926,52909,40041,39413,43409,36857,43297,45337,43852,45857,42744],
+  opinc:    [-27258,-20426,-44818,-35521,-9193,1173,2607,31489,54129,38491,61004,69502]
+};
+
+const JP_ACT = {
+  sales:    [26126,30745,39508,44397,31822,35001,40770,29640,31629,32745,31990,36362],
+  cogs:     [19612,23574,28085,28846,23727,24032,28952,22069,27027,23785,19329,23525],
+  gross:    [6514,7170,11423,15552,8094,10968,11819,7572,4602,8960,12661,12837],
+  sga:      [20188,18436,15064,15768,13263,15977,14862,20066,14796,17562,15395,18332],
+  opinc:    [-13674,-11266,-3641,-216,-5169,-5009,-3043,-12495,-10194,-8601,-2734,-5495]
+};
+
+const JP_PLAN = {
+  sales:    [28891,34637,45652,52491,50739,51814,54315,51344,57132,63935,69063,72866],
+  cogs:     [23390,24888,31504,36163,34983,35623,39249,35884,39819,44627,48292,54678],
+  gross:    [5501,9749,14148,16327,15756,16191,15066,15460,17313,19308,20771,18188],
+  sga:      [13878,11661,19146,14278,12209,12367,16948,15021,13394,16876,14961,14339],
+  opinc:    [-8377,-1912,-4997,2050,3547,3824,-1883,439,3919,2431,5809,3849]
+};
+
+const JP_INV = {
+  inv:      [34501,41323,36453,26084,33700,41613,58182,50972,50659,51517,51374,63274],
+  purchase: [20422,30396,23215,20391,31344,31945,47884,14858,27000,23785,19329,23525]
+};
+
+function fmt(v, prefix='$', divider=1) {
+  const n = Math.round(v/divider);
+  const neg = n < 0;
+  const abs = Math.abs(n).toLocaleString();
+  return neg ? `(${prefix}${abs})` : `${prefix}${abs}`;
+}
+function fmtJP(v) {
+  const n = Math.round(v);
+  if(Math.abs(n) >= 1000) return (n<0?'▲':'') + '¥'+Math.round(Math.abs(n)/1000)+'M';
+  return (n<0?'▲':'') + '¥'+Math.abs(n).toLocaleString()+'千';
+}
+function pct(g, s) { return s ? ((g/s)*100).toFixed(1)+'%' : '—'; }
+
+// Build charts
+function initCharts() {
+  // US Monthly overview
+  new Chart(document.getElementById('us-monthly-chart'), {
+    type: 'bar',
+    data: {
+      labels: MONTHS,
+      datasets: [
+        { label:'売上', data: US.sales, backgroundColor: '#1a5c3a', borderRadius:3 },
+        { label:'販管費', data: US.sga, backgroundColor: '#c47a1a88', borderRadius:3 },
+        { type:'line', label:'営業利益', data: US.opinc, borderColor:'#1a4a8a', backgroundColor:'transparent', pointRadius:3, borderWidth:2, tension:0.3 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{ ticks:{ callback: v => '$'+Math.round(v/1000)+'K', font:{size:10} }, grid:{color:'rgba(0,0,0,0.05)'} },
+        x:{ ticks:{font:{size:10}} }
+      }
+    }
+  });
+
+  // Japan monthly plan vs actual
+  new Chart(document.getElementById('jp-monthly-chart'), {
+    type: 'bar',
+    data: {
+      labels: MONTHS,
+      datasets: [
+        { label:'2026計画', data: JP_PLAN.sales, backgroundColor:'#1a5c3a', borderRadius:3 },
+        { label:'2025実績', data: JP_ACT.sales, backgroundColor:'#b0b0a088', borderRadius:3 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{ ticks:{ callback: v => '¥'+Math.round(v/1000)+'M', font:{size:10} }, grid:{color:'rgba(0,0,0,0.05)'} },
+        x:{ ticks:{font:{size:10}} }
+      }
+    }
+  });
+
+  // Japan PL chart
+  new Chart(document.getElementById('jp-pl-chart'), {
+    type: 'bar',
+    data: {
+      labels: MONTHS,
+      datasets: [
+        { label:'2026計画 売上', data: JP_PLAN.sales, backgroundColor:'#1a5c3a', borderRadius:3 },
+        { label:'2025実績 売上', data: JP_ACT.sales, backgroundColor:'#b0c4d088', borderRadius:3 },
+        { type:'line', label:'2026計画 営業利益', data: JP_PLAN.opinc, borderColor:'#c47a1a', backgroundColor:'transparent', pointRadius:3, borderWidth:2 },
+        { type:'line', label:'2025実績 営業利益', data: JP_ACT.opinc, borderColor:'#c0392b88', backgroundColor:'transparent', pointRadius:3, borderWidth:2, borderDash:[5,3] }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{ ticks:{ callback: v => '¥'+Math.round(v/1000)+'M', font:{size:10} } },
+        x:{ ticks:{font:{size:10}} }
+      }
+    }
+  });
+
+  // Inventory chart
+  new Chart(document.getElementById('inventory-chart'), {
+    type: 'bar',
+    data: {
+      labels: MONTHS,
+      datasets: [
+        { label:'期末棚卸高', data: JP_INV.inv, backgroundColor:'#1a5c3a88', borderRadius:3 },
+        { label:'仕入高', data: JP_INV.purchase, backgroundColor:'#c47a1a88', borderRadius:3 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{ ticks:{ callback: v => '¥'+Math.round(v/1000)+'M', font:{size:10} } },
+        x:{ ticks:{font:{size:10}} }
+      }
+    }
+  });
+
+  // Cashflow
+  const cumulative = [];
+  let cum = 0;
+  US.sales.forEach((s,i) => { cum += US.opinc[i]; cumulative.push(cum); });
+  new Chart(document.getElementById('cashflow-chart'), {
+    type: 'bar',
+    data: {
+      labels: MONTHS,
+      datasets: [
+        { label:'売上', data: US.sales, backgroundColor:'#1a5c3a88', borderRadius:3 },
+        { label:'総支出', data: US.sga.map((s,i)=>s+US.cogs[i]), backgroundColor:'#c0392b88', borderRadius:3 },
+        { type:'line', label:'累積損益', data: cumulative, borderColor:'#1a4a8a', backgroundColor:'transparent', pointRadius:3, borderWidth:2 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{ ticks:{ callback: v => '$'+Math.round(v/1000)+'K', font:{size:10} } },
+        x:{ ticks:{font:{size:10}} }
+      }
+    }
+  });
+
+  // US Channel donut
+  new Chart(document.getElementById('us-channel-chart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['BTB（卸）','Crisp','ZEN'],
+      datasets:[{ data:[72122,13607,9941], backgroundColor:['#1a5c3a','#c47a1a','#1a4a8a'], borderWidth:2 }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom', labels:{font:{size:11}}}}
+    }
+  });
+}
+
+// PL tables
+function buildPLTables() {
+  const jpBody = document.getElementById('jp-pl-table');
+  MONTHS.forEach((m,i) => {
+    const gp = JP_PLAN.gross[i];
+    const s = JP_PLAN.sales[i];
+    const op = JP_PLAN.opinc[i];
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${m}</td>
+      <td class="num">¥${Math.round(s/1000).toLocaleString()}千</td>
+      <td class="num">${pct(gp,s)}</td>
+      <td class="num ${op<0?'neg-num':'pos-num'}">${op<0?'▲':''}¥${Math.abs(Math.round(op/1000)).toLocaleString()}千</td>`;
+    jpBody.appendChild(row);
+  });
+
+  const usBody = document.getElementById('us-pl-table');
+  MONTHS.forEach((m,i) => {
+    const s = US.sales[i]; const g = US.gross[i]; const op = US.opinc[i];
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${m}</td>
+      <td class="num">$${s.toLocaleString()}</td>
+      <td class="num">$${g.toLocaleString()}</td>
+      <td class="num ${op<0?'neg-num':'pos-num'}">${op<0?'($'+Math.abs(op).toLocaleString()+')':'$'+op.toLocaleString()}</td>`;
+    usBody.appendChild(row);
+  });
+}
+
+// Integrated table
+function buildIntegratedTable() {
+  const body = document.getElementById('integrated-table-body');
+  MONTHS.forEach((m,i) => {
+    const s=US.sales[i], g=US.gross[i], op=US.opinc[i], c=US.cogs[i], sga=US.sga[i];
+    const inv=JP_INV.inv[i], pur=JP_INV.purchase[i];
+    const jpCogs=JP_PLAN.cogs[i];
+    const turnNum = jpCogs>0 ? inv/jpCogs : 0;
+    const turnover = jpCogs>0 ? turnNum.toFixed(2)+'ヶ月' : '—';
+    const turnClass = turnNum>2 ? 'neg-num' : turnNum>1.5 ? 'metric-warn' : 'pos-num';
+    const status = op>0 ? '<span class="badge badge-green">黒字</span>' : op>-10000 ? '<span class="badge badge-amber">改善中</span>' : '<span class="badge badge-red">投資期</span>';
+    const row = document.createElement('tr');
+    row.innerHTML = `<td><strong>${m}</strong></td>
+      <td class="num">$${s.toLocaleString()}</td>
+      <td class="num">$${c.toLocaleString()}</td>
+      <td class="num">$${g.toLocaleString()}</td>
+      <td class="num">${pct(g,s)}</td>
+      <td class="num">$${sga.toLocaleString()}</td>
+      <td class="num ${op<0?'neg-num':'pos-num'}">${op<0?'($'+Math.abs(op).toLocaleString()+')':'$'+op.toLocaleString()}</td>
+      <td class="num" style="border-left:2px solid rgba(0,0,0,0.1)">¥${inv.toLocaleString()}</td>
+      <td class="num">¥${pur.toLocaleString()}</td>
+      <td class="num ${turnClass}">${turnover}</td>
+      <td>${status}</td>`;
+    body.appendChild(row);
+  });
+}
+
+// Month selectors
+function buildMonthSel(id, onSelect) {
+  const el = document.getElementById(id);
+  MONTHS.forEach((m,i) => {
+    const chip = document.createElement('div');
+    chip.className = 'm-chip' + (i===5?' active':'');
+    chip.textContent = m;
+    chip.onclick = () => {
+      el.querySelectorAll('.m-chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+      onSelect(i);
+    };
+    el.appendChild(chip);
+  });
+}
+
+function updateIntegrated(i) {
+  const kpi = document.getElementById('integrated-kpi');
+  const s=US.sales[i], g=US.gross[i], op=US.opinc[i], sga=US.sga[i], c=US.cogs[i];
+  const jps=JP_PLAN.sales[i]*1000, jpop=JP_PLAN.opinc[i]*1000;
+  const inv=JP_INV.inv[i]*1000, pur=JP_INV.purchase[i]*1000;
+  kpi.innerHTML = `
+    <div class="card"><h3>米国売上 ${MONTHS[i]}</h3><div class="metric-big">$${s.toLocaleString()}</div><div class="metric-sub">仕入原価 $${c.toLocaleString()}</div></div>
+    <div class="card"><h3>米国営業利益</h3><div class="metric-big ${op<0?'metric-neg':'metric-pos'}">${op<0?'($'+Math.abs(op).toLocaleString()+')':'$'+op.toLocaleString()}</div><div class="metric-sub">販管費 $${sga.toLocaleString()}</div></div>
+    <div class="card"><h3>日本売上 ${MONTHS[i]}</h3><div class="metric-big">¥${Math.round(jps/1000).toLocaleString()}千</div><div class="metric-sub">計画値</div></div>
+    <div class="card"><h3>日本 棚卸</h3><div class="metric-big metric-warn">¥${Math.round(inv/1000).toLocaleString()}千</div><div class="metric-sub">仕入 ¥${Math.round(pur/1000).toLocaleString()}千</div></div>
+  `;
+  const flowDiv = document.getElementById('integrated-flow');
+  flowDiv.innerHTML = `<h3>資金フロー（米国 ${MONTHS[i]}）</h3>
+    <div class="flow-row">
+      <div class="flow-box"><div class="label">売上</div><div class="val">$${s.toLocaleString()}</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box"><div class="label">粗利</div><div class="val">$${g.toLocaleString()}</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box"><div class="label">販管費後</div><div class="val ${op<0?'neg-num':'pos-num'}">${op<0?'('+Math.abs(op).toLocaleString()+')':op.toLocaleString()}</div></div>
+    </div>
+    <div style="font-size:12px; color:var(--text2)">粗利率: ${pct(g,s)} / 販管費率: ${s?((sga/s)*100).toFixed(1)+'%':'—'}</div>`;
+  const sigDiv = document.getElementById('integrated-signals');
+  const alerts = [];
+  if(i===6) alerts.push({type:'warn', msg:'KeHE 2027ロードマップ 提出期限（7月末）'});
+  if(i===0) alerts.push({type:'warn', msg:'花村社長 US $30K返済期日（7月）'});
+  if(i>=6) alerts.push({type:'ok', msg:'USDA Organic ラベル対応済み出荷'});
+  if(i===7) alerts.push({type:'ok', msg:'Crisp D2C + Amazon ローンチ（8月）'});
+  if(i===11) alerts.push({type:'warn', msg:'花村社長 残額返済 + MPower再ピッチ（10月）準備'});
+  if(op > 0) alerts.push({type:'ok', msg:'米国 営業黒字月'});
+  if(!alerts.length) alerts.push({type:'ok', msg:'特記アラートなし'});
+  sigDiv.innerHTML = '<h3>注目シグナル</h3>' + alerts.map(a => `<div class="alert-box alert-${a.type}">${a.msg}</div>`).join('');
+}
+
+// Tab switching
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`.tab[onclick="switchTab('${id}')"]`).classList.add('active');
+  document.getElementById('panel-'+id).classList.add('active');
+}
+
+// AI Chat
+async function sendChat() {
+  const input = document.getElementById('chat-in');
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  appendMsg('user', q);
+  const thinkId = appendMsg('ai', '<span class="thinking">考えています...</span>');
+
+  const systemPrompt = `あなたはBrown Sugar 1st（Better Than Butter / BTBブランド）の経営AIアシスタントです。
+創業者・CEOのみどり（Midori Ogino、佐藤みどり）の経営パートナーとして、在庫・仕入・営業・資金繰り・損益を横断的に支援します。
+
+【会社概要】
+- BTB（Better Than Butter）: 96%ココナッツ系植物性バター、USDA Organic・Non-GMO・Halal・Vegan認証済
+- 製造: OLEO（O社）フィリピン ※外部には非公開
+- 米国: 44店舗稼働中（KeHE DC41/Chino経由）、KeHE/Misfits Market/Good Eggs/Erewhon等
+- 日本: 通販・B2B・卸チャネル稼働中
+- 2026年目標: 米国1,000店舗、Phase2 $1.5M調達（8月）
+
+【米国 2026年月次実績/予算（USD）】
+月: 1月〜12月
+売上: 3409,1500,9000,4610,31129,46022,40373,77127,102625,84052,109120,113956
+粗利: 0,450,2700,1383,9339,13807,12112,23138,30788,25216,32736,34187
+販管費: 30379,21926,52909,40041,39413,43409,36857,43297,45337,43852,45857,42744
+営業利益: -27258,-20426,-44818,-35521,-9193,1173,2607,31489,54129,38491,61004,69502
+
+【日本 2025年実績（千円）】
+売上: 26126,30745,39508,44397,31822,35001,40770,29640,31629,32745,31990,36362
+営業利益: -13674,-11266,-3641,-216,-5169,-5009,-3043,-12495,-10194,-8601,-2734,-5495
+
+【日本 2026年計画（千円）】
+売上: 28891,34637,45652,52491,50739,51814,54315,51344,57132,63935,69063,72866
+営業利益: -8377,-1912,-4997,2050,3547,3824,-1883,439,3919,2431,5809,3849
+
+【棚卸（日本 千円）】期末: 34501,41323,36453,26084,33700,41613,58182,50972,50659,51517,51374,63274
+
+【重要案件】
+- Sprouts採用 → KeHE DC33起動 + MPowerピッチデータ（最重要変数）
+- Phase2 $1.5M調達（2026年8月）
+- 花村社長債務: US $30K（7月）+ 残額（11月）、JP ¥28M（11月）
+- KeHE 2027ロードマップ提出期限: 7/17〜31、Midori最終署名
+- USDA Organic ラベル: 7月出荷分〜
+
+日本語で答えてください。簡潔・実用的・数字を使って答えてください。`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 800,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: q }]
+      })
+    });
+    const data = await resp.json();
+    const text = data.content?.map(b=>b.text||'').join('') || 'エラーが発生しました。';
+    updateMsg(thinkId, text);
+  } catch(e) {
+    updateMsg(thinkId, 'AI接続エラー。ネットワークを確認してください。');
+  }
+}
+
+function sendQuick(q) {
+  document.getElementById('chat-in').value = q;
+  sendChat();
+}
+
+let msgCount = 0;
+function appendMsg(role, html) {
+  const id = 'msg-' + (++msgCount);
+  const div = document.createElement('div');
+  div.className = 'msg';
+  div.id = id;
+  div.innerHTML = `<div class="msg-${role==='user'?'user':'ai'}">${html}</div>`;
+  const container = document.getElementById('chat-messages');
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return id;
+}
+
+function updateMsg(id, text) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const formatted = text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^([0-9]+\. )/gm, '<br>$1')
+    .replace(/^(- )/gm, '• ')
+    .split('\n').map(l => l.trim() ? `<p>${l}</p>` : '').join('');
+  el.querySelector('div').innerHTML = formatted || text;
+  document.getElementById('chat-messages').scrollTop = 9999;
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', () => {
+  initCharts();
+  buildPLTables();
+  buildIntegratedTable();
+  buildMonthSel('us-month-sel', () => {});
+  buildMonthSel('integrated-month-sel', i => updateIntegrated(i));
+  updateIntegrated(5); // default June
+});
+</script>
+</body>
+</html>
